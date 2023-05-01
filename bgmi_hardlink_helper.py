@@ -1,6 +1,6 @@
 from bgmi.lib.models import STATUS_DELETED, STATUS_END, STATUS_UPDATING, Followed
 from bgmi.front.index import get_player
-from bgmi.config import SAVE_PATH
+from bgmi.config import cfg
 import os
 from config import *
 import argparse as arg
@@ -37,7 +37,7 @@ def run_hardlink(preview=False):
             path = ep['path']
             info['format'] = path.split('.')[-1]
             # 源位置
-            src_path = os.path.join(SAVE_PATH, path[1:])
+            src_path = os.path.join(cfg.save_path, path[1:])
             # 目标位置
             dst_dir = os.path.join(
                 HARDLINK_DEST,
