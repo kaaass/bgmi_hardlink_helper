@@ -24,6 +24,7 @@ def extract_season_from_bgmi(bgmi_data: dict):
     info = {
         'name': bgmi_data['bangumi_name'],
         'season': 1,
+        'ep_offset': None,
     }
 
     # 特殊规则
@@ -31,6 +32,8 @@ def extract_season_from_bgmi(bgmi_data: dict):
     if rule is not None:
         info['name'] = rule['name']
         info['season'] = rule['season']
+        if 'ep_offset' in rule:
+            info['ep_offset'] = rule['ep_offset']
         return info
 
     # 检查番剧名中的季
@@ -73,12 +76,16 @@ def run_hardlink(preview=False):
             'season': 1,
             'episode': None,
             'format': None,
+            'ep_offset': None,
         }
         info.update(extract_season_from_bgmi(bangumi))
         # 获得播放数据
         player_data = get_player(bangumi['bangumi_name'])
         for episode, ep in player_data.items():
-            info['episode'] = episode
+            if info['ep_offset'] is not None:
+                info['episode'] = episode + info['ep_offset']
+            else:
+                info['episode'] = episode
             path = ep['path']
             info['format'] = path.split('.')[-1]
             # 源位置
