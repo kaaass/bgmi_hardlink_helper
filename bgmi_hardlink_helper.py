@@ -2,19 +2,21 @@ import argparse as arg
 import os
 import re
 
-from bgmi import config as bgmi_config
+from bgmi import __version__ as bgmi_version, config as bgmi_config
 from bgmi.front.index import get_player
-from bgmi.lib.models import STATUS_DELETED, STATUS_UPDATING, Followed
+
+_BGMI_V5 = int(bgmi_version.split('.')[0]) >= 5
+if _BGMI_V5:
+    from bgmi.lib.table import Bangumi, Followed
+else:
+    from bgmi.lib.models import STATUS_DELETED, STATUS_UPDATING, Followed
 
 from config import *
 
 if hasattr(bgmi_config, 'SAVE_PATH'):
     save_path = bgmi_config.SAVE_PATH
-elif hasattr(bgmi_config, 'cfg'):
-    save_path = bgmi_config.cfg.save_path
 else:
-    print("不支持此 BGmi 版本！")
-    exit(1)
+    save_path = bgmi_config.cfg.save_path
 
 _CHINESE_NUMBERS = '一二三四五六七八九十'
 _PATH_SANITIZE_TABLE = str.maketrans({
@@ -44,7 +46,7 @@ def extract_season_from_bgmi(bgmi_data: dict):
     }
 
     # 特殊规则
-    rule = MAP_RULE.get(info['name'], None)
+    rule = MAP_RULE.get(bgmi_data['bangumi_name'], None)
     if rule is not None:
         info['name'] = rule['name']
         info['season'] = rule['season']
@@ -82,7 +84,16 @@ def run_hardlink(preview=False):
     """
 
     # 获取番剧数据
-    data = Followed.get_all_followed(STATUS_DELETED, STATUS_UPDATING)
+    if _BGMI_V5:
+        data = [{
+            'bangumi_name': followed.bangumi_name,
+            'episodes': followed.episodes,
+            'season': followed.season,
+            'episode_offset': followed.episode_offset,
+            'display_name': followed.display_name,
+        } for followed, _bangumi in Followed.get_all_followed(bangumi_status=Bangumi.STATUS_UPDATING)]
+    else:
+        data = Followed.get_all_followed(STATUS_DELETED, STATUS_UPDATING)
     print("共订阅", len(data), "番剧，开始扫描...")
 
     # 创建硬链接
@@ -97,8 +108,17 @@ def run_hardlink(preview=False):
             'ep_offset': None,
         }
         info.update(extract_season_from_bgmi(bangumi))
-        # 获得播放数据
-        player_data = get_player(bangumi['bangumi_name'])
+        # v5 订阅参数只用于定位源文件，目标命名仍由 config.py 和番名决定
+        if _BGMI_V5:
+            player_data = get_player(
+                bangumi['bangumi_name'],
+                episodes=bangumi['episodes'],
+                season=bangumi['season'],
+                episode_offset=bangumi['episode_offset'],
+                display_name=bangumi['display_name'],
+            )
+        else:
+            player_data = get_player(bangumi['bangumi_name'])
         # 若偏移会导致任意集数小于 1，则整部番剧不应用偏移
         if player_data and info['ep_offset'] is not None:
             if min(player_data) + info['ep_offset'] < 1:
