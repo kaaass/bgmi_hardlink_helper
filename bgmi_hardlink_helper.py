@@ -17,6 +17,22 @@ else:
     exit(1)
 
 _CHINESE_NUMBERS = '一二三四五六七八九十'
+_PATH_SANITIZE_TABLE = str.maketrans({
+    '/': '／',
+    '\\': '＼',
+    ':': '：',
+    '?': '？',
+    '*': '＊',
+    '<': '＜',
+    '>': '＞',
+    '|': '｜',
+    '"': '＂',
+})
+
+
+def _sanitize_path_component(value: str) -> str:
+    """将名称中的非法路径字符替换为全角符号"""
+    return value.translate(_PATH_SANITIZE_TABLE)
 
 
 def extract_season_from_bgmi(bgmi_data: dict):
@@ -34,6 +50,7 @@ def extract_season_from_bgmi(bgmi_data: dict):
         info['season'] = rule['season']
         if 'ep_offset' in rule:
             info['ep_offset'] = rule['ep_offset']
+        info['name'] = _sanitize_path_component(info['name'])
         return info
 
     # 检查番剧名中的季
@@ -54,6 +71,7 @@ def extract_season_from_bgmi(bgmi_data: dict):
             info['name'] = r.group(1)
             info['season'] = season
 
+    info['name'] = _sanitize_path_component(info['name'])
     return info
 
 
@@ -81,6 +99,10 @@ def run_hardlink(preview=False):
         info.update(extract_season_from_bgmi(bangumi))
         # 获得播放数据
         player_data = get_player(bangumi['bangumi_name'])
+        # 若偏移会导致任意集数小于 1，则整部番剧不应用偏移
+        if player_data and info['ep_offset'] is not None:
+            if min(player_data) + info['ep_offset'] < 1:
+                info['ep_offset'] = None
         for episode, ep in player_data.items():
             if info['ep_offset'] is not None:
                 info['episode'] = episode + info['ep_offset']
